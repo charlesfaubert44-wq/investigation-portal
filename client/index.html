@@ -142,6 +142,32 @@
   }
 
   initAuth();
+  <script>
+  document.getElementById('investigationForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Stop the page from reloading
+
+    // Get the form data
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+
+    // Get the Auth0 token (already stored earlier)
+    const token = localStorage.getItem('authToken');
+
+    // Send the data to your backend
+    await fetch('https://investigation-api.onrender.com/api/investigations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` // Secure access
+      },
+      body: JSON.stringify(data)
+    });
+
+    alert('Investigation created successfully!');
+    e.target.reset(); // Clear the form
+  });
+</script>
+
 </script>
 
 </body>
