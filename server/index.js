@@ -67,3 +67,16 @@ function requireRole(role) {
     next();
   };
 }
+
+let investigations = [];
+
+app.get('/api/investigations', requireAuth, (req, res) => {
+  res.json(investigations);
+});
+
+app.post('/api/investigations', requireAuth, requireRole('investigator'), (req, res) => {
+  const { title, description, status, deadline } = req.body;
+  const newCase = { id: Date.now(), title, description, status, deadline };
+  investigations.push(newCase);
+  res.json({ success: true, case: newCase });
+});
