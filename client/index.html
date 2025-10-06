@@ -109,6 +109,30 @@
         });
       });
   </script>
+<script>
+  let auth0 = null;
+
+  async function initAuth() {
+    auth0 = await createAuth0Client({
+      domain: 'YOUR_DOMAIN',
+      client_id: 'YOUR_CLIENT_ID'
+    });
+
+    const isAuthenticated = await auth0.isAuthenticated();
+    if (!isAuthenticated) {
+      await auth0.loginWithRedirect();
+    }
+
+    const user = await auth0.getUser();
+    const token = await auth0.getTokenSilently();
+
+    // Show user info or role-based UI
+    console.log('Logged in as:', user);
+    localStorage.setItem('authToken', token);
+  }
+
+  initAuth();
+</script>
 
 </body>
 </html>
