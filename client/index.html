@@ -1,1 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WSCC Investigation Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <header class="bg-blue-900 text-white p-4 shadow">
+    <h1 class="text-2xl font-bold">WSCC Investigation Management Portal</h1>
+  </header>
+
+  <nav class="bg-blue-700 text-white px-4 py-2 flex gap-6 text-sm font-semibold">
+    <a href="#">Dashboard</a>
+    <a href="#">Investigations</a>
+    <a href="#">Evidence</a>
+    <a href="#">Reports</a>
+    <a href="#">Legislation</a>
+  </nav>
+
+  <main class="p-6 space-y-8">
+
+    <section>
+      <h2 class="text-xl font-bold text-blue-900 mb-4">Dashboard Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Total Active Investigations</h3>
+          <p id="totalCases" class="text-3xl mt-2 text-blue-700 font-bold">...</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Charge Deadlines This Month</h3>
+          <p id="chargeDeadlines" class="text-3xl mt-2 text-yellow-600 font-bold">...</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">High Risk Cases</h3>
+          <p id="highRisk" class="text-3xl mt-2 text-red-600 font-bold">...</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-blue-900 mb-4">Evidence Manager</h2>
+      <form id="evidenceForm" class="bg-white p-6 rounded shadow space-y-4">
+        <div>
+          <label class="block font-medium">Investigation ID</label>
+          <input name="investigationId" type="text" class="w-full border rounded px-3 py-2 mt-1" />
+        </div>
+        <div>
+          <label class="block font-medium">Description</label>
+          <textarea name="description" class="w-full border rounded px-3 py-2 mt-1"></textarea>
+        </div>
+        <div>
+          <label class="block font-medium">Location</label>
+          <input name="location" type="text" class="w-full border rounded px-3 py-2 mt-1" />
+        </div>
+        <div>
+          <label class="block font-medium">Upload Photos</label>
+          <input name="photos" type="file" multiple class="mt-1" />
+        </div>
+        <button type="submit" class="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800">Add Evidence</button>
+      </form>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-blue-900 mb-4">Legislation Library</h2>
+      <div id="legislationList" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    </section>
+
+  </main>
+
+  <script>
+    const API_BASE = 'https://investigation-api.onrender.com';
+
+    fetch(`${API_BASE}/api/dashboard/summary`)
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('totalCases').textContent = data.total;
+        document.getElementById('chargeDeadlines').textContent = data.deadlines;
+        document.getElementById('highRisk').textContent = data.highRisk;
+      });
+
+    document.getElementById('evidenceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      await fetch(`${API_BASE}/api/evidence`, {
+        method: 'POST',
+        body: formData
+      });
+      alert('Evidence submitted successfully');
+      e.target.reset();
+    });
+
+    fetch(`${API_BASE}/api/legislation`)
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('legislationList');
+        data.forEach(doc => {
+          const card = document.createElement('div');
+          card.className = "bg-white p-4 rounded shadow";
+          card.innerHTML = `
+            <h3 class="text-lg font-semibold">${doc.title}</h3>
+            <p class="text-sm text-gray-600 mb-2">${doc.category} (${doc.jurisdiction})</p>
+            <a href="${doc.url}" target="_blank" class="text-blue-600 hover:underline">View Document</a>
+          `;
+          container.appendChild(card);
+        });
+      });
+  </script>
+
+</body>
+</html>
 
