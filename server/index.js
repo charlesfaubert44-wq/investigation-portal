@@ -45,3 +45,25 @@ app.get('/api/legislation', (req, res) => {
 
 app.listen(3000, () => console.log('Server running on http://localhost:3000'));
 
+const jwt = require('jsonwebtoken');
+
+function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).send('Unauthorized');
+  try {
+    const user = jwt.decode(token); // Use Auth0's public key for verification in production
+    req.user = user;
+    next();
+  } catch {
+    res.status(403).send('Forbidden');
+  }
+}
+
+function requireRole(role) {
+  return (req, res, next) => {
+    if (!req.user || !req.user['https://yourdomain.com/roles']?.includes(role)) {
+      return res.status(403).send('Forbidden');
+    }
+    next();
+  };
+}
