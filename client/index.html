@@ -119,56 +119,57 @@
         });
       });
   </script>
-<script>
-  let auth0 = null;
 
-  async function initAuth() {
-    auth0 = await createAuth0Client({
-      domain: 'dev-o05e1b87irncothe.ca.auth0.com',
-      client_id: 'SuZaMg7UykFXNuSLFNUYoCxlEWTxiAQD'
-    });
+  <script>
+    let auth0 = null;
 
-    const isAuthenticated = await auth0.isAuthenticated();
-    if (!isAuthenticated) {
-      await auth0.loginWithRedirect();
+    async function initAuth() {
+      auth0 = await createAuth0Client({
+        domain: 'dev-o05e1b87irncothe.ca.auth0.com',
+        client_id: 'SuZaMg7UykFXNuSLFNUYoCxlEWTxiAQD'
+      });
+
+      const isAuthenticated = await auth0.isAuthenticated();
+      if (!isAuthenticated) {
+        await auth0.loginWithRedirect();
+      }
+
+      const user = await auth0.getUser();
+      const token = await auth0.getTokenSilently();
+
+      // Show user info or role-based UI
+      console.log('Logged in as:', user);
+      localStorage.setItem('authToken', token);
     }
 
-    const user = await auth0.getUser();
-    const token = await auth0.getTokenSilently();
+    initAuth();
+  </script>
 
-    // Show user info or role-based UI
-    console.log('Logged in as:', user);
-    localStorage.setItem('authToken', token);
-  }
-
-  initAuth();
   <script>
-  document.getElementById('investigationForm').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Stop the page from reloading
+    document.getElementById('investigationForm').addEventListener('submit', async (e) => {
+      e.preventDefault(); // Stop the page from reloading
 
-    // Get the form data
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData.entries());
+      // Get the form data
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData.entries());
 
-    // Get the Auth0 token (already stored earlier)
-    const token = localStorage.getItem('authToken');
+      // Get the Auth0 token (already stored earlier)
+      const token = localStorage.getItem('authToken');
 
-    // Send the data to your backend
-    await fetch('https://investigation-api.onrender.com/api/investigations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` // Secure access
-      },
-      body: JSON.stringify(data)
+      // Send the data to your backend
+      await fetch('https://investigation-api.onrender.com/api/investigations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` // Secure access
+        },
+        body: JSON.stringify(data)
+      });
+
+      alert('Investigation created successfully!');
+      e.target.reset(); // Clear the form
     });
-
-    alert('Investigation created successfully!');
-    e.target.reset(); // Clear the form
-  });
-</script>
-
-</script>
+  </script>
 
 </body>
 </html>
