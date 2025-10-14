@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yellowknife Grocery Price Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛒 Yellowknife Grocery Price Tracker</h1>
+            <p class="subtitle">Track daily grocery prices across Yellowknife stores</p>
+            <div class="date-display">
+                <span id="current-date"></span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="add-price">Add Price</button>
+            <button class="tab-btn" data-tab="view-prices">Recent Prices</button>
+            <button class="tab-btn" data-tab="trends">Price Trends</button>
+            <button class="tab-btn" data-tab="comparison">Store Comparison</button>
+            <button class="tab-btn" data-tab="manage">Manage Items</button>
+        </nav>
+
+        <!-- Add Price Tab -->
+        <div id="add-price" class="tab-content active">
+            <div class="card">
+                <h2>Add New Price Entry</h2>
+                <form id="add-price-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="item-select">Item *</label>
+                            <select id="item-select" required>
+                                <option value="">Select an item...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="store-select">Store *</label>
+                            <select id="store-select" required>
+                                <option value="">Select a store...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="price-input">Price ($) *</label>
+                            <input type="number" id="price-input" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="date-input">Date *</label>
+                            <input type="date" id="date-input" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes-input">Notes (optional)</label>
+                        <input type="text" id="notes-input" placeholder="e.g., on sale, bulk purchase">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Price</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Today's Entries</h3>
+                <div id="today-summary"></div>
+            </div>
+        </div>
+
+        <!-- View Prices Tab -->
+        <div id="view-prices" class="tab-content">
+            <div class="card">
+                <h2>Recent Price Entries</h2>
+                <div class="filter-row">
+                    <label>Show last:</label>
+                    <select id="days-filter">
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30" selected>30 days</option>
+                        <option value="60">60 days</option>
+                        <option value="90">90 days</option>
+                    </select>
+                </div>
+                <div id="recent-prices"></div>
+            </div>
+        </div>
+
+        <!-- Price Trends Tab -->
+        <div id="trends" class="tab-content">
+            <div class="card">
+                <h2>Price Trends</h2>
+                <div class="form-group">
+                    <label for="trend-item-select">Select Item</label>
+                    <select id="trend-item-select">
+                        <option value="">Choose an item to see trends...</option>
+                    </select>
+                </div>
+                <div id="trend-chart"></div>
+            </div>
+        </div>
+
+        <!-- Store Comparison Tab -->
+        <div id="comparison" class="tab-content">
+            <div class="card">
+                <h2>Latest Price Comparison Across Stores</h2>
+                <div id="comparison-table"></div>
+            </div>
+        </div>
+
+        <!-- Manage Items Tab -->
+        <div id="manage" class="tab-content">
+            <div class="card">
+                <h2>Add New Item</h2>
+                <form id="add-item-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="item-name">Item Name *</label>
+                            <input type="text" id="item-name" required placeholder="e.g., Milk 2L">
+                        </div>
+                        <div class="form-group">
+                            <label for="category-select">Category *</label>
+                            <select id="category-select" required>
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="unit-input">Unit</label>
+                        <input type="text" id="unit-input" placeholder="e.g., each, kg, lb, L" value="each">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>All Items</h3>
+                <div id="items-list"></div>
+            </div>
+
+            <div class="card">
+                <h3>Add New Store</h3>
+                <form id="add-store-form">
+                    <div class="form-group">
+                        <label for="store-name">Store Name *</label>
+                        <input type="text" id="store-name" required placeholder="e.g., Walmart">
+                    </div>
+                    <div class="form-group">
+                        <label for="store-location">Location</label>
+                        <input type="text" id="store-location" placeholder="Yellowknife, NT" value="Yellowknife, NT">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Store</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
