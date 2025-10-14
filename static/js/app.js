@@ -26,6 +26,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load today's summary
     loadTodaySummary();
+
+    // Load scraping status
+    loadScrapingStatus();
+
+    // Load comparison on start
+    loadComparison();
 });
 
 function setupTabs() {
@@ -51,6 +57,8 @@ function setupTabs() {
                 loadComparison();
             } else if (tabId === 'manage') {
                 loadItemsList();
+            } else if (tabId === 'auto-scrape') {
+                loadScrapingStatusDetail();
             }
         });
     });
@@ -245,6 +253,48 @@ function setupForms() {
             document.getElementById('trend-chart').innerHTML = '';
         }
     });
+
+    // Trigger scrape button
+    document.getElementById('trigger-scrape-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('trigger-scrape-btn');
+        const resultDiv = document.getElementById('scrape-result');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Updating prices...';
+        resultDiv.innerHTML = '<p style="color: var(--text-secondary);">This may take a minute...</p>';
+        
+        try {
+            const res = await fetch('/api/scrape', { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <div class="scrape-stats">
+                        <div class="stat-card">
+                            <div class="stat-value">${data.total_saved}</div>
+                            <div class="stat-label">Prices Updated</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${Object.keys(data.results).length}</div>
+                            <div class="stat-label">Stores Scraped</div>
+                        </div>
+                    </div>
+                `;
+                showNotification('Prices updated successfully!', 'success');
+                loadScrapingStatus();
+                loadComparison();
+            } else {
+                resultDiv.innerHTML = `<p style="color: var(--danger);">Error: ${data.error}</p>`;
+                showNotification('Error updating prices', 'error');
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color: var(--danger);">Error: ${error.message}</p>`;
+            showNotification('Error updating prices', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 Update Prices Now';
+        }
+    });
 }
 
 async function loadTodaySummary() {
@@ -274,7 +324,7 @@ async function loadTodaySummary() {
                         <tr>
                             <td>${entry.item_name} <span class="category-badge">${entry.category_name || 'Other'}</span></td>
                             <td><span class="store-badge">${entry.store_name}</span></td>
-                            <td><span class="price-badge">$${entry.price.toFixed(2)}</span></td>
+                            <td><span class="price-badge">$${entry.price.toFixed(2)}</span> ${getSourceBadge(entry.source)}</td>
                             <td>${entry.notes || '-'}</td>
                         </tr>
                     `).join('')}
@@ -319,7 +369,7 @@ async function loadRecentPrices() {
                             <td>${new Date(entry.date).toLocaleDateString()}</td>
                             <td>${entry.item_name} <span class="category-badge">${entry.category_name || 'Other'}</span></td>
                             <td><span class="store-badge">${entry.store_name}</span></td>
-                            <td><span class="price-badge">$${entry.price.toFixed(2)}</span></td>
+                            <td><span class="price-badge">$${entry.price.toFixed(2)}</span> ${getSourceBadge(entry.source)}</td>
                             <td>${entry.notes || '-'}</td>
                         </tr>
                     `).join('')}
@@ -486,6 +536,71 @@ async function loadItemsList() {
     });
 
     container.innerHTML = html;
+}
+
+async function loadScrapingStatus() {
+    try {
+        const res = await fetch('/api/scrape/status');
+        const status = await res.json();
+        
+        const statusText = document.getElementById('status-text');
+        const indicator = document.querySelector('.status-indicator');
+        
+        if (status.enabled) {
+            const lastScrape = status.last_scrape ? new Date(status.last_scrape).toLocaleString() : 'Never';
+            statusText.textContent = `Auto-updates active (${status.mode}) • Last: ${lastScrape}`;
+            indicator.classList.remove('disabled');
+        } else {
+            statusText.textContent = 'Auto-updates disabled';
+            indicator.classList.add('disabled');
+        }
+    } catch (error) {
+        console.error('Error loading scraping status:', error);
+    }
+}
+
+async function loadScrapingStatusDetail() {
+    try {
+        const res = await fetch('/api/scrape/status');
+        const status = await res.json();
+        
+        const container = document.getElementById('scrape-status-detail');
+        const lastScrape = status.last_scrape ? new Date(status.last_scrape).toLocaleDateString() : 'Never';
+        
+        const html = `
+            <div class="scrape-stats">
+                <div class="stat-card">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" style="font-size: 1.5rem;">
+                        ${status.enabled ? '✅ Active' : '❌ Disabled'}
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Update Interval</div>
+                    <div class="stat-value">${status.interval_hours}h</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Last Update</div>
+                    <div class="stat-value" style="font-size: 1.2rem;">${lastScrape}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Mode</div>
+                    <div class="stat-value" style="font-size: 1.2rem;">${status.mode === 'demo' ? '🎭 Demo' : '🚀 Live'}</div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading scraping status detail:', error);
+    }
+}
+
+function getSourceBadge(source) {
+    if (!source || source === 'manual') {
+        return '<span class="source-badge manual">Manual</span>';
+    }
+    return '<span class="source-badge auto">Auto</span>';
 }
 
 function showNotification(message, type = 'success') {

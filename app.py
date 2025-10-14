@@ -2,13 +2,32 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 from datetime import datetime, timedelta
 import sqlite3
 import json
+import os
 from pathlib import Path
+from apscheduler.schedulers.background import BackgroundScheduler
+from scrapers.scraper_manager import ScraperManager
+from config import Config
+import logging
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'yellowknife-grocery-tracker-2025'
+app.config.from_object(Config)
 
 # Database setup
 DATABASE = 'grocery_prices.db'
+
+# Initialize scraper manager
+scraper_manager = ScraperManager(DATABASE, use_demo=True)
+
+# Initialize scheduler for automatic price updates
+scheduler = BackgroundScheduler()
+scheduler.start()
 
 def get_db():
     """Get database connection"""
@@ -25,6 +44,8 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 location TEXT,
+                website_url TEXT,
+                scraping_enabled BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -53,6 +74,7 @@ def init_db():
                 price REAL NOT NULL,
                 date DATE NOT NULL,
                 notes TEXT,
+                source TEXT DEFAULT 'manual',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (item_id) REFERENCES items (id),
                 FOREIGN KEY (store_id) REFERENCES stores (id)
@@ -61,17 +83,24 @@ def init_db():
         
         # Add some default stores in Yellowknife
         stores = [
-            ('Independent Grocer', 'Yellowknife, NT'),
-            ('Extra Foods', 'Yellowknife, NT'),
-            ('The Co-op', 'Yellowknife, NT'),
-            ('Save-On-Foods', 'Yellowknife, NT')
+            ('Independent Grocer', 'Yellowknife, NT', 'https://www.atlanticsuperstore.ca/', 1),
+            ('Extra Foods', 'Yellowknife, NT', 'https://www.extrafoods.ca/', 1),
+            ('The Co-op', 'Yellowknife, NT', 'https://www.coopathome.ca/', 1),
+            ('Save-On-Foods', 'Yellowknife, NT', 'https://www.saveonfoods.com/', 1)
         ]
         
-        for store_name, location in stores:
+        for store_name, location, url, scraping in stores:
             try:
-                db.execute('INSERT INTO stores (name, location) VALUES (?, ?)', (store_name, location))
+                db.execute(
+                    'INSERT INTO stores (name, location, website_url, scraping_enabled) VALUES (?, ?, ?, ?)', 
+                    (store_name, location, url, scraping)
+                )
             except sqlite3.IntegrityError:
-                pass  # Store already exists
+                # Update existing stores to enable scraping
+                db.execute(
+                    'UPDATE stores SET scraping_enabled = ?, website_url = ? WHERE name = ?',
+                    (scraping, url, store_name)
+                )
         
         # Add default categories
         categories = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Pantry', 'Frozen', 'Beverages', 'Snacks']
@@ -82,6 +111,21 @@ def init_db():
                 pass  # Category already exists
         
         db.commit()
+        logger.info("Database initialized successfully")
+
+def scheduled_scrape():
+    """Scheduled task to scrape all stores"""
+    if not Config.SCRAPING_ENABLED:
+        logger.info("Scraping is disabled in configuration")
+        return
+    
+    logger.info("Starting scheduled scrape...")
+    try:
+        results = scraper_manager.scrape_all_stores(save_to_db=True)
+        total = sum(r.get('saved_count', 0) for r in results.values())
+        logger.info(f"Scheduled scrape complete. Saved {total} prices.")
+    except Exception as e:
+        logger.error(f"Error in scheduled scrape: {str(e)}")
 
 @app.route('/')
 def index():
@@ -96,8 +140,11 @@ def stores():
     if request.method == 'POST':
         data = request.json
         try:
-            db.execute('INSERT INTO stores (name, location) VALUES (?, ?)', 
-                      (data['name'], data.get('location', '')))
+            db.execute(
+                'INSERT INTO stores (name, location, website_url, scraping_enabled) VALUES (?, ?, ?, ?)', 
+                (data['name'], data.get('location', ''), data.get('website_url', ''), 
+                 data.get('scraping_enabled', 0))
+            )
             db.commit()
             return jsonify({'success': True})
         except sqlite3.IntegrityError:
@@ -151,11 +198,11 @@ def prices():
     if request.method == 'POST':
         data = request.json
         db.execute('''
-            INSERT INTO prices (item_id, store_id, price, date, notes) 
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO prices (item_id, store_id, price, date, notes, source) 
+            VALUES (?, ?, ?, ?, ?, ?)
         ''', (data['item_id'], data['store_id'], data['price'], 
               data.get('date', datetime.now().strftime('%Y-%m-%d')), 
-              data.get('notes', '')))
+              data.get('notes', ''), data.get('source', 'manual')))
         db.commit()
         return jsonify({'success': True})
     
@@ -190,7 +237,8 @@ def price_trends(item_id):
     days = request.args.get('days', 90, type=int)
     
     trends = db.execute('''
-        SELECT prices.date, prices.price, stores.name as store_name, prices.notes
+        SELECT prices.date, prices.price, stores.name as store_name, 
+               prices.notes, prices.source
         FROM prices
         JOIN stores ON prices.store_id = stores.id
         WHERE prices.item_id = ? AND date >= date('now', '-' || ? || ' days')
@@ -226,13 +274,13 @@ def price_comparison():
     # Get the latest price for each item at each store
     comparison = db.execute('''
         WITH LatestPrices AS (
-            SELECT item_id, store_id, price, date,
+            SELECT item_id, store_id, price, date, source,
                    ROW_NUMBER() OVER (PARTITION BY item_id, store_id ORDER BY date DESC) as rn
             FROM prices
         )
         SELECT items.name as item_name, items.unit,
                stores.name as store_name,
-               LatestPrices.price, LatestPrices.date,
+               LatestPrices.price, LatestPrices.date, LatestPrices.source,
                categories.name as category_name
         FROM LatestPrices
         JOIN items ON LatestPrices.item_id = items.id
@@ -244,15 +292,91 @@ def price_comparison():
     
     return jsonify([dict(row) for row in comparison])
 
+@app.route('/api/scrape', methods=['POST'])
+def trigger_scrape():
+    """Manually trigger a scrape of all stores"""
+    if not Config.SCRAPING_ENABLED:
+        return jsonify({
+            'success': False, 
+            'error': 'Scraping is disabled in configuration'
+        }), 400
+    
+    try:
+        logger.info("Manual scrape triggered")
+        results = scraper_manager.scrape_all_stores(save_to_db=True)
+        
+        total_products = sum(r.get('products_count', 0) for r in results.values())
+        total_saved = sum(r.get('saved_count', 0) for r in results.values())
+        
+        return jsonify({
+            'success': True,
+            'total_products': total_products,
+            'total_saved': total_saved,
+            'results': results
+        })
+    except Exception as e:
+        logger.error(f"Error in manual scrape: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/scrape/store/<store_name>', methods=['POST'])
+def scrape_store(store_name):
+    """Manually trigger a scrape of a specific store"""
+    if not Config.SCRAPING_ENABLED:
+        return jsonify({
+            'success': False, 
+            'error': 'Scraping is disabled in configuration'
+        }), 400
+    
+    try:
+        logger.info(f"Manual scrape triggered for {store_name}")
+        result = scraper_manager.scrape_store(store_name, save_to_db=True)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error scraping {store_name}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/scrape/status')
+def scrape_status():
+    """Get status of automatic scraping"""
+    last_scrape = scraper_manager.get_last_scrape_time()
+    
+    return jsonify({
+        'enabled': Config.SCRAPING_ENABLED,
+        'interval_hours': Config.SCRAPING_INTERVAL_HOURS,
+        'last_scrape': last_scrape,
+        'mode': 'demo' if scraper_manager.use_demo else 'production'
+    })
+
 if __name__ == '__main__':
     # Initialize database
     init_db()
     
-    # Run the app
-    print("\n" + "="*50)
-    print("Yellowknife Grocery Price Tracker")
-    print("="*50)
-    print("\nStarting server at http://127.0.0.1:5000")
-    print("Press CTRL+C to quit\n")
+    # Schedule automatic scraping if enabled
+    if Config.SCRAPING_ENABLED:
+        # Run initial scrape
+        logger.info("Running initial price scrape...")
+        scheduled_scrape()
+        
+        # Schedule periodic scraping
+        scheduler.add_job(
+            func=scheduled_scrape,
+            trigger='interval',
+            hours=Config.SCRAPING_INTERVAL_HOURS,
+            id='scrape_prices',
+            replace_existing=True
+        )
+        logger.info(f"Scheduled automatic scraping every {Config.SCRAPING_INTERVAL_HOURS} hours")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Run the app
+    print("\n" + "="*60)
+    print("🛒 Yellowknife Grocery Price Tracker - ONLINE VERSION")
+    print("="*60)
+    print(f"\n🌐 Server: http://{Config.HOST}:{Config.PORT}")
+    print(f"🤖 Auto-scraping: {'ENABLED' if Config.SCRAPING_ENABLED else 'DISABLED'}")
+    if Config.SCRAPING_ENABLED:
+        print(f"⏰ Scraping interval: Every {Config.SCRAPING_INTERVAL_HOURS} hours")
+        print(f"🎭 Mode: {'DEMO (sample data)' if scraper_manager.use_demo else 'PRODUCTION'}")
+    print("\n💡 Press CTRL+C to quit\n")
+    print("="*60 + "\n")
+    
+    app.run(debug=(Config.FLASK_ENV == 'development'), host=Config.HOST, port=Config.PORT)

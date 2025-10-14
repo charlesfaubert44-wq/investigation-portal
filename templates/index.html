@@ -10,22 +10,38 @@
     <div class="container">
         <header>
             <h1>🛒 Yellowknife Grocery Price Tracker</h1>
-            <p class="subtitle">Track daily grocery prices across Yellowknife stores</p>
+            <p class="subtitle">Automatic price tracking across Yellowknife stores</p>
             <div class="date-display">
                 <span id="current-date"></span>
+            </div>
+            <div class="scraping-status" id="scraping-status">
+                <span class="status-indicator"></span>
+                <span id="status-text">Loading...</span>
             </div>
         </header>
 
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="add-price">Add Price</button>
+            <button class="tab-btn active" data-tab="comparison">Price Comparison</button>
             <button class="tab-btn" data-tab="view-prices">Recent Prices</button>
             <button class="tab-btn" data-tab="trends">Price Trends</button>
-            <button class="tab-btn" data-tab="comparison">Store Comparison</button>
+            <button class="tab-btn" data-tab="add-price">Add Price Manually</button>
             <button class="tab-btn" data-tab="manage">Manage Items</button>
+            <button class="tab-btn" data-tab="auto-scrape">Auto-Scraping</button>
         </nav>
 
+        <!-- Store Comparison Tab -->
+        <div id="comparison" class="tab-content active">
+            <div class="card">
+                <h2>Latest Price Comparison Across Stores</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    🤖 Prices are automatically updated every few hours. Green borders indicate the best prices!
+                </p>
+                <div id="comparison-table"></div>
+            </div>
+        </div>
+
         <!-- Add Price Tab -->
-        <div id="add-price" class="tab-content active">
+        <div id="add-price" class="tab-content">
             <div class="card">
                 <h2>Add New Price Entry</h2>
                 <form id="add-price-form">
@@ -99,11 +115,48 @@
             </div>
         </div>
 
-        <!-- Store Comparison Tab -->
-        <div id="comparison" class="tab-content">
+        <!-- Auto-Scraping Tab -->
+        <div id="auto-scrape" class="tab-content">
             <div class="card">
-                <h2>Latest Price Comparison Across Stores</h2>
-                <div id="comparison-table"></div>
+                <h2>🤖 Automatic Price Scraping</h2>
+                <div id="scrape-status-detail"></div>
+                
+                <div style="margin-top: 20px;">
+                    <h3>Manual Update</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                        Trigger an immediate price update from all stores
+                    </p>
+                    <button id="trigger-scrape-btn" class="btn btn-primary">
+                        🔄 Update Prices Now
+                    </button>
+                    <div id="scrape-result" style="margin-top: 15px;"></div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h3>How Auto-Scraping Works</h3>
+                    <div class="info-box">
+                        <p>✅ <strong>Automatic Updates:</strong> Prices are fetched every 6 hours from all Yellowknife stores</p>
+                        <p>🎭 <strong>Demo Mode:</strong> Currently using sample data. Real scraping requires store-specific implementation</p>
+                        <p>🔍 <strong>Smart Matching:</strong> Items are automatically categorized and matched</p>
+                        <p>💾 <strong>Always Available:</strong> All historical prices are saved for trend analysis</p>
+                        <p>🏪 <strong>Stores Tracked:</strong> Independent Grocer, Extra Foods, The Co-op, Save-On-Foods</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h3>Implementing Real Store Scrapers</h3>
+                    <div class="code-box">
+                        <p><strong>For Developers:</strong></p>
+                        <p>1. Edit <code>scrapers/independent_scraper.py</code> and similar files</p>
+                        <p>2. Analyze the store website's HTML structure</p>
+                        <p>3. Implement the <code>scrape_products()</code> method</p>
+                        <p>4. Update <code>config.py</code> to set <code>use_demo=False</code></p>
+                        <p>5. Ensure compliance with store Terms of Service</p>
+                        <p style="margin-top: 10px; color: var(--warning);">
+                            ⚠️ <strong>Legal Note:</strong> Always respect robots.txt and terms of service. Consider using official APIs when available.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 

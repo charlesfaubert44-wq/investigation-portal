@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: yellowknife-grocery-tracker
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SCRAPING_ENABLED
+        value: true
+      - key: SCRAPING_INTERVAL_HOURS
+        value: 6
+      - key: SECRET_KEY
+        generateValue: true
+    autoDeploy: true
